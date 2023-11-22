@@ -11,7 +11,7 @@ Install Pytorch and other dependencies:
 Copy dataset in the folder `data_model`.
 The struture is shown as below
 
-![alt text](https://raw.githubusercontent.com/khanhvynguyen/asfsadfasf)
+![alt text](https://raw.githubusercontent.com/khanhvynguyen/Breast_Cancer_NN_Project/main/pics/dataset.png?token=GHSAT0AAAAAACDIHFII3ZXHB5PGZE4PNJWKZK6K6MA)
 
 
 
