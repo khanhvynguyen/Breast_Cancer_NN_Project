@@ -75,6 +75,7 @@ def main(args):
         net = make_resnet18(input_dim=n_channels, num_classes=2)
     else:
         raise NotImplementedError()
+    net = net.to(device)
 
     # Optimizer
     if config["optimizer"] == "adam":
@@ -138,7 +139,6 @@ def main(args):
             log,
         )
 
-    print_out(f"Final test accuracy: {final_test_acc}", log)
 
     ## TODO: move the following code to a separate function in utils.py
     # Create table result
@@ -150,6 +150,9 @@ def main(args):
 
     print_out(f"Train summary: {df_train_summary}", log)
     print_out(f"Eval summary: {df_eval_summary}", log)
+
+    print_out(f"Final test accuracy: {final_test_acc}", log)
+
 
     # Visulaize the results
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))

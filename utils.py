@@ -132,7 +132,7 @@ def print_out(print_str, log):
 
 
 if __name__ == "__main__":  ### put all test code in this block
-    folder_path = "/Users/vy/Documents/NEU_course/NN_course/breast_cancer_NN_project/data_model/"
+    folder_path = "data_model/"
     df = create_dataset_csv(folder_path)
     print(df.sample(30))
     df.to_csv("breast_cancer_meta_data.csv")
