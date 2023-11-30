@@ -1,0 +1,11 @@
+n_epochs: 10
+batch_size: 32
+h: 224
+w: 224
+lr: 0.004
+optimizer: adam
+momentum: 0.7
+device: "cuda:0"
+kernel_size: 3
+flatten: false
+model: ResNet

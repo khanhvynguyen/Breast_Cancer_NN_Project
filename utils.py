@@ -58,12 +58,6 @@ def create_dataset_csv(root_dir: str, seed: int = 2023):
     return df
 
 
-def compute_accuracy(logits: Tensor, labels: Tensor, batch_size: int):  ## accuracy of 1 batch
-    corrects = (torch.max(logits, 1)[1].view(labels.size()).data == labels.data).sum()
-    accuracy = 100.0 * corrects / batch_size
-    return accuracy.item()
-
-
 def find_images(directory, image_extensions=["*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp"]):
     """
     Recursively finds all images in the directory with specified extensions.
@@ -95,7 +89,7 @@ def get_dataloaders(batch_size: int, img_size: Tuple):
     transform = transforms.Compose(
         [
             transforms.ToTensor(),
-            transforms.Resize(img_size),
+            transforms.Resize(img_size, antialias=True),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
     )

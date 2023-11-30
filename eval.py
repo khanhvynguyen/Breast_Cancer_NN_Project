@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torch.utils.data.dataloader import DataLoader
-from utils import compute_accuracy
 import numpy as np
 
 

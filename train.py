@@ -7,7 +7,7 @@ from torch.utils.data.dataloader import DataLoader
 import time
 from tqdm import tqdm
 from typing import Tuple
-from utils import compute_accuracy, print_out
+from utils import print_out
 import numpy as np
 
 
@@ -15,7 +15,7 @@ def train_one_epoch(
     model: nn.Module,
     trainloader: DataLoader,
     device: torch.device,  ## device: default "cpu",
-    optimizer: torch.optim.SGD,  ### SGD: rule update theta: theta_new= theta_old - learning rate * gradient
+    optimizer,  ### SGD: rule update theta: theta_new= theta_old - learning rate * gradient
     criterion: torch.nn.CrossEntropyLoss,
     flatten: bool,
 ):
@@ -37,9 +37,8 @@ def train_one_epoch(
 
     n_batches = len(trainloader)
     ## Loop over all the batches
-    # for i, (images, labels) in tqdm(enumerate(trainloader, 1), total=len(trainloader), desc=f"training 1 epoch..."):
-    for i, (images, labels, magnifications) in enumerate(
-        trainloader
+    for i, (images, labels, magnifications) in tqdm(
+        enumerate(trainloader, 1), total=len(trainloader), desc=f"training 1 epoch..."
     ):  # train one batch (images, labels of 1 batch)
         # For each batch, we have:
         #     + `images`: `bath_size` images in training set
