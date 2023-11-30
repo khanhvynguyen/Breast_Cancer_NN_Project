@@ -3,9 +3,9 @@ batch_size: 32
 h: 224
 w: 224
 lr: 0.001
-optimizer: configs/resnetv1.yaml
+optimizer: sgd
 momentum: 0.9
-device: "cuda:0"
+device: "cuda:1"
 kernel_size: 3
 flatten: false
 model: resnet18

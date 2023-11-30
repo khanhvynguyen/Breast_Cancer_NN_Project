@@ -8,4 +8,4 @@ momentum: 0.9
 device: "cuda:0"
 kernel_size: 3
 flatten: false
-model: ResNet
+model: resnet18

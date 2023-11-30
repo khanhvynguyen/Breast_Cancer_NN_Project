@@ -209,25 +209,25 @@ def make_resnet18(input_dim: int, num_classes: int):
 def make_resnet34(input_dim: int, num_classes: int):
     """return a ResNet 34 object"""
     num_blocks_list = [3, 4, 6, 3]
-    return ResNet(in_dim, num_classes, block=BasicBlock, num_blocks_list=num_blocks_list)
+    return ResNet(input_dim, num_classes, block=BasicBlock, num_blocks_list=num_blocks_list)
 
 
 def make_resnet50(input_dim: int, num_classes: int):
     """return a ResNet 50 object"""
     num_blocks_list = [3, 4, 6, 3]
-    return ResNet(in_dim, num_classes, block=BottleneckBlock, num_blocks_list=num_blocks_list)
+    return ResNet(input_dim, num_classes, block=BottleneckBlock, num_blocks_list=num_blocks_list)
 
 
 def make_resnet101(input_dim: int, num_classes: int):
     """return a ResNet 101 object"""
     num_blocks_list = [3, 4, 23, 3]
-    return ResNet(in_dim, num_classes, block=BottleneckBlock, num_blocks_list=num_blocks_list)
+    return ResNet(input_dim, num_classes, block=BottleneckBlock, num_blocks_list=num_blocks_list)
 
 
 def make_resnet152(input_dim: int, num_classes: int):
     """return a ResNet 101 object"""
     num_blocks_list = [3, 8, 36, 3]
-    return ResNet(in_dim, num_classes, block=BottleneckBlock, num_blocks_list=num_blocks_list)
+    return ResNet(input_dim, num_classes, block=BottleneckBlock, num_blocks_list=num_blocks_list)
 
 
 def analyze_model(model: ResNet):

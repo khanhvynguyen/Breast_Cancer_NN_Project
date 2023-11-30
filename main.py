@@ -10,7 +10,7 @@ from utils import get_dataloaders, print_out
 from models.CNN import MyCNN
 from train import train_one_epoch
 from eval import eval_model
-from models.resnet import make_resnet18
+from models.resnet import make_resnet18, make_resnet34
 from models.MLP import MLPModel
 
 
@@ -71,11 +71,17 @@ def main(args):
             n_classes=n_classes,
             kernel_size=kernel_size,
         )  # type: ignore
-    elif model == "ResNet":
+    elif model == "resnet18":
         net = make_resnet18(input_dim=n_channels, num_classes=2)
+    elif model == "resnet34":
+        net = make_resnet34(input_dim=n_channels, num_classes=2)
     else:
         raise NotImplementedError()
+    if config.get("n_gpus", 0) > 1:
+        net = torch.nn.DataParallel(net)
     net = net.to(device)
+  
+
 
     # Optimizer
     if config["optimizer"] == "adam":
@@ -197,8 +203,12 @@ def main(args):
 
 if __name__ == "__main__":
     ## create a parser object
-    parser = argparse.ArgumentParser()
+    # parser = argparse.ArgumentParser()
 
-    parser.add_argument("--config_file_name", "-c", type=str, default="resnetv1")
-    args = parser.parse_args()
-    main(args)
+    # parser.add_argument("--config_file_name", "-c", type=str, default="resnetv1")
+    # args = parser.parse_args()
+    # main(args)
+
+    for config_file in ["resnetv6", "resnetv7", "resnetv8", "resnetv9"]:
+        args = argparse.Namespace(config_file_name=config_file)
+        main(args)
