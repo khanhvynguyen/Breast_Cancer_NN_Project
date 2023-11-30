@@ -4,14 +4,18 @@ import random
 import os
 import torchvision.transforms as transforms
 import torch
+import time
+
 from torch import Tensor
 from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
 from typing import Tuple
 from dataset import BreastCancer
 
+from sklearn.model_selection import train_test_split
 
-def create_dataset_csv(root_dir: str):
+
+def create_dataset_csv(root_dir: str, seed: int = 2023):
     """
     create the csv table with columns:
     - img_path: file path to each image
@@ -38,13 +42,19 @@ def create_dataset_csv(root_dir: str):
     ## '/.../SOB_M_MC-14-13418DE-100-009.png'           benign              MC             100X       train
     ## '/.../SOB_M_MC-14-13418DE-100-008.png'           benign              MC             100X       train
     ## '/.../SOB_M_MC-14-13418DE-100-003.png'           benign              MC             100X       train
-    train_len = int(len(df) * 0.6)
-    valid_len = int(len(df) * 0.2)
-    split = (
-        ["train"] * train_len + ["valid"] * valid_len + ["test"] * (len(df) - train_len - valid_len)
+
+    ## split the dataset into train:eval:test = 60:20:20, stratified by magnification
+    train, valid_test = train_test_split(
+        df, test_size=0.4, stratify=df["magnification"], random_state=seed
     )
-    random.shuffle(split)
-    df["split"] = split
+    valid, test = train_test_split(
+        valid_test, test_size=0.5, stratify=valid_test["magnification"], random_state=seed
+    )
+    train["split"] = "train"
+    valid["split"] = "valid"
+    test["split"] = "test"
+    df = pd.concat([train, valid, test])
+
     return df
 
 
@@ -119,8 +129,16 @@ def get_dataloaders(batch_size: int, img_size: Tuple):
     return trainloader, validloader, testloader
 
 
+def print_out(print_str, log):
+    print(print_str)
+    datetime_now = time.strftime("%Y-%m-%d_%H-%M-%S")
+    ## append different models to log file:
+    log.write(datetime_now + ": " + print_str + "\n")
+    log.flush()
+
+
 if __name__ == "__main__":  ### put all test code in this block
     folder_path = "/Users/vy/Documents/NEU_course/NN_course/breast_cancer_NN_project/data_model/"
     df = create_dataset_csv(folder_path)
-    print(df.sample(10))
+    print(df.sample(30))
     df.to_csv("breast_cancer_meta_data.csv")

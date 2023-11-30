@@ -21,6 +21,9 @@ def eval_model(
     eval_loss = 0.0
     mapper = {"0": "40X", "1": "100X", "2": "200X", "3": "400X"}
     eval_acc = {"40X": 0.0, "100X": 0.0, "200X": 0.0, "400X": 0.0}
+    num_imgs = {"40X": 0, "100X": 0, "200X": 0, "400X": 0}
+    num_imgs_all = 0
+    eval_acc_all = 0
 
     ## Number of batches
     n_batches = len(evalloader)
@@ -57,12 +60,20 @@ def eval_model(
             if batch_size_i == 0:
                 continue
             magnif = mapper[str(i)]
-            eval_acc[magnif] += compute_accuracy(logits_i, labels_i, batch_size_i)
+            num_imgs[magnif] += batch_size_i
+            predict_i = torch.max(logits_i, 1)[1].view(labels_i.size()).data
+            correct_i = (predict_i == labels_i.data).sum()
+            eval_acc[magnif] += correct_i.item()
 
-    eval_acc = {k: v / n_batches for k, v in eval_acc.items()}
+            # compute eval_acc_all
+            num_imgs_all += batch_size_i
+            eval_acc_all += correct_i.item()
+
+    eval_acc = {k: round(v * 100 / num_imgs[k], 2) for k, v in eval_acc.items()}
     eval_loss = eval_loss / n_batches
     # compute average aval_acc
-    eval_acc["avg_acc"] = np.mean(list(eval_acc.values()))
+    eval_acc["avg_acc"] = round(np.mean(list(eval_acc.values())), 2)
+    eval_acc["all_acc"] = round(eval_acc_all * 100 / num_imgs_all, 2)
 
     ## TODO:
     if is_auc:

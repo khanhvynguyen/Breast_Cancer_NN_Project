@@ -7,7 +7,7 @@ from torch.utils.data.dataloader import DataLoader
 import time
 from tqdm import tqdm
 from typing import Tuple
-from utils import compute_accuracy
+from utils import compute_accuracy, print_out
 import numpy as np
 
 
@@ -31,6 +31,9 @@ def train_one_epoch(
 
     mapper = {"0": "40X", "1": "100X", "2": "200X", "3": "400X"}
     train_acc = {"40X": 0.0, "100X": 0.0, "200X": 0.0, "400X": 0.0}
+    num_imgs = {"40X": 0, "100X": 0, "200X": 0, "400X": 0}
+    num_imgs_all = 0
+    train_acc_all = 0
 
     n_batches = len(trainloader)
     ## Loop over all the batches
@@ -61,17 +64,17 @@ def train_one_epoch(
         # You need to get the output from the model, store in a new variable named `logits`
         logits = model(images)  ## call forward funtion from class FirstNeuralNet
 
-        ##### [YOUR CODE] Step 2. Compare the output that the model gives us with the real labels
+        ##### Step 2. Compare the output that the model gives us with the real labels
         ## You need to compute the loss, store in a new variable named `loss`
         loss = criterion(logits, labels)
 
-        ##### [YOUR CODE] Step 3. Clear the gradient buffer (because Pytorch accumulates gradients by default, so we need to clear the old gradients before computing the gradients of the current batch)
+        ##### Step 3. Clear the gradient buffer (because Pytorch accumulates gradients by default, so we need to clear the old gradients before computing the gradients of the current batch)
         optimizer.zero_grad()
 
-        ##### [YOUR CODE] Step 4. Backward pass: compute the gradients of the loss w.r.t parameters using backpropagation
+        ##### Step 4. Backward pass: compute the gradients of the loss w.r.t parameters using backpropagation
         loss.backward()
 
-        ##### [YOUR CODE] Step 5. Update the parameters by stepping in the opposite direction of the gradient
+        ##### Step 5. Update the parameters by stepping in the opposite direction of the gradient
         optimizer.step()
 
         # End of your code --------------------------------------------------------------------------------------------------------
@@ -89,11 +92,18 @@ def train_one_epoch(
             if batch_size_i == 0:
                 continue
             magnif = mapper[str(i)]
-            train_acc[magnif] += compute_accuracy(logits_i, labels_i, batch_size_i)
+            num_imgs[magnif] += batch_size_i
+            predict_i = torch.max(logits_i, 1)[1].view(labels_i.size()).data
+            correct_i = (predict_i == labels_i.data).sum()
+            train_acc[magnif] += correct_i.item()
 
-    train_acc = {k: v / n_batches for k, v in train_acc.items()}
+            num_imgs_all += batch_size_i
+            train_acc_all += correct_i.item()
+
+    train_acc = {k: round(v * 100 / num_imgs[k], 2) for k, v in train_acc.items()}
     train_loss = train_loss / n_batches
     # compute average aval_acc
-    train_acc["avg_acc"] = np.mean(list(train_acc.values()))
+    train_acc["avg_acc"] = round(np.mean(list(train_acc.values())), 2)
+    train_acc["all_acc"] = round(train_acc_all * 100 / num_imgs_all, 2)
 
     return train_acc, train_loss
