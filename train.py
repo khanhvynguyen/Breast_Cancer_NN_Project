@@ -18,6 +18,7 @@ def train_one_epoch(
     optimizer,  ### SGD: rule update theta: theta_new= theta_old - learning rate * gradient
     criterion: torch.nn.CrossEntropyLoss,
     flatten: bool,
+    debug: bool = False,
 ):
     """
     Train 1 epoch on trainloader
@@ -48,6 +49,10 @@ def train_one_epoch(
         # we flatten it to 1d (num_channels * width * height)
         # For CNN, we don't need to do this because CNN can handle 3d input
         # breakpoint()
+        if debug:
+            print("debug!!!!")
+            if i > 2:
+                break
         if flatten:
             images = images.reshape(images.shape[0], -1)
         # breakpoint()

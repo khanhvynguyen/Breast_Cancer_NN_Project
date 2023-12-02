@@ -5,7 +5,11 @@ import os
 import torchvision.transforms as transforms
 import torch
 import time
-
+import matplotlib.pyplot as plt
+import pprint
+import yaml
+import itertools
+from typing import List, Dict
 from torch import Tensor
 from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
@@ -75,7 +79,7 @@ def get_mean_std(dataloader):
     mean_img = 0
     mean_squared = 0
     num_batches = len(dataloader)
-    for images, _ in tqdm(dataloader):
+    for images, _,_ in tqdm(dataloader):
         mean_img += images.mean(dim=(0, 2, 3))
         mean_squared += images.mean(dim=(0, 2, 3)) ** 2
     mean = mean_img / num_batches
@@ -90,7 +94,7 @@ def get_dataloaders(batch_size: int, img_size: Tuple):
         [
             transforms.ToTensor(),
             transforms.Resize(img_size, antialias=True),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+            transforms.Normalize((0.5719, 0.2510, 0.5272), (0.0005, 0.0011, 0.0004)),
         ]
     )
 
@@ -131,8 +135,84 @@ def print_out(print_str, log):
     log.flush()
 
 
+def plot_train_eval_summary(df_train_summary, df_eval_summary):
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+
+    ax1.plot(df_train_summary["epoch"], df_train_summary["40X"], label="40X")
+    ax1.plot(df_train_summary["epoch"], df_train_summary["100X"], label="100X")
+    ax1.plot(df_train_summary["epoch"], df_train_summary["200X"], label="200X")
+    ax1.plot(df_train_summary["epoch"], df_train_summary["400X"], label="400X")
+    ax1.plot(
+        df_train_summary["epoch"],
+        df_train_summary["avg_acc"],
+        label="Average Accuracy",
+        color="black",
+        linewidth=2,
+        linestyle="--",
+    )
+    ax1.set_title("Training accuracy over Epochs")
+    ax1.set_xlabel("Epoch")
+    ax1.set_ylabel("Accuracy (%)")
+    ax1.legend()
+
+    ax2.plot(df_eval_summary["epoch"], df_eval_summary["40X"], label="40X")
+    ax2.plot(df_eval_summary["epoch"], df_eval_summary["100X"], label="100X")
+    ax2.plot(df_eval_summary["epoch"], df_eval_summary["200X"], label="200X")
+    ax2.plot(df_eval_summary["epoch"], df_eval_summary["400X"], label="400X")
+    ax2.plot(
+        df_eval_summary["epoch"],
+        df_eval_summary["avg_acc"],
+        label="Average Accuracy",
+        color="black",
+        linewidth=2,
+        linestyle="--",
+    )
+    ax2.set_title("Training accuracy over Epochs")
+    ax2.set_title("Evaluation accuracy over Epochs")
+    ax2.set_xlabel("Epoch")
+    ax2.set_ylabel("Accuracy (%)")
+    ax2.legend()
+
+    plt.show()
+
+
+
+def get_grid_search(config_path: str, 
+                    optimizers: list, 
+                    learning_rates: list,
+                    num_blocks_list:list,
+                    is_batchnorm:list) -> List[Dict]:
+    """
+    Read the config file and return a list of all possible combinations of hyperparameters
+    """
+    ## read the config file
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    combinations = list(
+        itertools.product(optimizers, learning_rates, num_blocks_list, is_batchnorm)
+    )
+    grid_search = []
+    for opt, lr, num_blocks, bn in combinations:
+        new_config = config.copy()
+        new_config["optimizer"] = opt
+        new_config["lr"] = lr
+        new_config["num_blocks_list"] = num_blocks
+        new_config["is_batchnorm"] = bn
+        grid_search.append(new_config)
+
+    return grid_search
+
 if __name__ == "__main__":  ### put all test code in this block
-    folder_path = "data_model/"
-    df = create_dataset_csv(folder_path)
-    print(df.sample(30))
-    df.to_csv("breast_cancer_meta_data.csv")
+    # folder_path = "data_model/"
+    # df = create_dataset_csv(folder_path)
+    # print(df.sample(30))
+    # df.to_csv("breast_cancer_meta_data.csv")
+    # Calculate mean and std of trainloader
+    trainloader = get_dataloaders(batch_size=32, img_size=(224, 224))[0]
+    mean, std = get_mean_std(trainloader)
+    print(mean)
+    print(std)
+# tensor([0.5719, 0.2510, 0.5272])
+# tensor([0.0005, 0.0011, 0.0004])

@@ -5,25 +5,31 @@ import matplotlib.pyplot as plt
 import os
 import yaml
 import argparse
-
-from utils import get_dataloaders, print_out
+import pprint
+from tqdm import tqdm
+from utils import get_dataloaders, print_out, plot_train_eval_summary,get_grid_search
 from models.CNN import MyCNN
 from train import train_one_epoch
 from eval import eval_model
-from models.resnet import make_resnet18, make_resnet34
+from models.resnet import ResNet
 from models.MLP import MLPModel
 
+def analyze_model(model, log):
+    pp = pprint.PrettyPrinter(indent=4)
+    pp.pprint(list(model.state_dict().keys()))
 
-def main(args):
+    total_num = sum(p.numel() for p in model.parameters())
+    trainable_num = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    for name, param in model.named_parameters():
+        print_out(f"{name}: {param.shape}", log)
+    print_out(f"\nTotal parameters: {total_num:,};\tTrainable: {trainable_num:,}", log)
+
+
+def main(config):
     """
     model_type: MLP or CNN or ResNet
     """
-    config_file_name = args.config_file_name
-
-    ## read the config file
-    with open(f"configs/{config_file_name}.yaml") as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-
     ## Hyperparameters
     n_epochs = config["n_epochs"]
     batch_size = config["batch_size"]
@@ -36,6 +42,8 @@ def main(args):
     model = config["model"]
     kernel_list = config.get("kernel_list", None)
     optimizer = config["optimizer"]
+    debug = config.get("debug", False)
+    num_blocks_list = config["num_blocks_list"]
 
     ## check if cuda is available
     if not torch.cuda.is_available():
@@ -49,6 +57,8 @@ def main(args):
 
     ## create a new folder to store log files named logs
     os.makedirs("logs", exist_ok=True)
+    ## create a new folder to store figures named figures
+    os.makedirs("figures", exist_ok=True)
 
     datetime_now = time.strftime("%Y-%m-%d_%H-%M-%S")
     log_filename = f"logs/{model}_epoch{n_epochs}_lr{lr}_{datetime_now}.log"
@@ -71,17 +81,16 @@ def main(args):
             n_classes=n_classes,
             kernel_size=kernel_size,
         )  # type: ignore
-    elif model == "resnet18":
-        net = make_resnet18(input_dim=n_channels, num_classes=2)
-    elif model == "resnet34":
-        net = make_resnet34(input_dim=n_channels, num_classes=2)
+    elif model == "resnet":
+        net = ResNet(input_dim=3, num_classes=2, num_blocks_list=num_blocks_list)
     else:
         raise NotImplementedError()
+    
+    analyze_model(net, log)
+
     if config.get("n_gpus", 0) > 1:
         net = torch.nn.DataParallel(net)
     net = net.to(device)
-  
-
 
     # Optimizer
     if config["optimizer"] == "adam":
@@ -90,7 +99,8 @@ def main(args):
         optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=momentum)
     else:
         raise NotImplementedError(f"Optimizer {config['optimizer']} not implemented")
-
+    
+    # Loss function
     loss = torch.nn.CrossEntropyLoss()  ### Compute Loss (CELoss, MSE)
 
     train_acc_summary = []
@@ -101,7 +111,7 @@ def main(args):
     best_valid_acc = 0.0
     final_test_acc = 0.0
 
-    for e in range(n_epochs):
+    for e in range(1, n_epochs+1):
         start_time = time.time()  ## time at the beginning of epoch, for logging purpose
         train_acc, train_loss = train_one_epoch(
             model=net,
@@ -110,7 +120,14 @@ def main(args):
             optimizer=optimizer,
             criterion=loss,
             flatten=flatten,
+            debug=debug
         )
+
+        fig_name = f"{model}_epoch{e}_lr{lr}_{datetime_now}.png"
+        roc_name_valid = f"figures/roc_valid_e{e}_{fig_name}"
+        cm_name_valid = f"figures/cm_valid_e{e}_{fig_name}"
+        roc_name_test = f"figures/roc_test_e{e}_{fig_name}"
+        cm_name_test = f"figures/cm_test_e{e}_{fig_name}"
 
         valid_acc, valid_loss = eval_model(
             model=net,
@@ -118,6 +135,8 @@ def main(args):
             evalloader=validloader,
             criterion=loss,
             flatten=flatten,
+            cm_name = cm_name_valid,
+            roc_name = roc_name_valid
         )
         test_acc, test_loss = eval_model(
             model=net,
@@ -125,11 +144,23 @@ def main(args):
             evalloader=testloader,
             criterion=loss,
             flatten=flatten,
+            cm_name = cm_name_test,
+            roc_name = roc_name_test
         )
 
         if valid_acc["avg_acc"] > best_valid_acc:
             best_valid_acc = valid_acc["avg_acc"]
             final_test_acc = test_acc
+            os.makedirs("best_figures", exist_ok=True)
+            for magnif in ["40X", "100X", "200X", "400X"]:
+                best_cm_name_test = f"best_figures/cm_test_{fig_name}"
+                command_cm = f"cp {cm_name_test.replace('.png', f'_{magnif}.png')} {best_cm_name_test.replace('.png', f'_{magnif}.png')}"
+                os.system(command_cm)
+
+            best_roc_name_test = f"best_figures/roc_test_{fig_name}"
+            command_roc = f"cp {roc_name_test} {best_roc_name_test}"
+            os.system(command_roc)
+
 
         train_acc_summary.append(train_acc)
         train_loss_summary.append(train_loss)
@@ -145,8 +176,6 @@ def main(args):
             log,
         )
 
-
-    ## TODO: move the following code to a separate function in utils.py
     # Create table result
     df_epoch = pd.DataFrame({"epoch": range(1, n_epochs + 1)})
     df_train = pd.DataFrame(train_acc_summary)
@@ -161,54 +190,17 @@ def main(args):
 
 
     # Visulaize the results
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
-
-    ax1.plot(df_train_summary["epoch"], df_train_summary["40X"], label="40X")
-    ax1.plot(df_train_summary["epoch"], df_train_summary["100X"], label="100X")
-    ax1.plot(df_train_summary["epoch"], df_train_summary["200X"], label="200X")
-    ax1.plot(df_train_summary["epoch"], df_train_summary["400X"], label="400X")
-    ax1.plot(
-        df_train_summary["epoch"],
-        df_train_summary["avg_acc"],
-        label="Average Accuracy",
-        color="black",
-        linewidth=2,
-        linestyle="--",
-    )
-    ax1.set_title("Training accuracy over Epochs")
-    ax1.set_xlabel("Epoch")
-    ax1.set_ylabel("Accuracy (%)")
-    ax1.legend()
-
-    ax2.plot(df_eval_summary["epoch"], df_eval_summary["40X"], label="40X")
-    ax2.plot(df_eval_summary["epoch"], df_eval_summary["100X"], label="100X")
-    ax2.plot(df_eval_summary["epoch"], df_eval_summary["200X"], label="200X")
-    ax2.plot(df_eval_summary["epoch"], df_eval_summary["400X"], label="400X")
-    ax2.plot(
-        df_eval_summary["epoch"],
-        df_eval_summary["avg_acc"],
-        label="Average Accuracy",
-        color="black",
-        linewidth=2,
-        linestyle="--",
-    )
-    ax2.set_title("Training accuracy over Epochs")
-    ax2.set_title("Evaluation accuracy over Epochs")
-    ax2.set_xlabel("Epoch")
-    ax2.set_ylabel("Accuracy (%)")
-    ax2.legend()
-
-    plt.show()
-
+    plot_train_eval_summary(df_train_summary, df_eval_summary)
+    # Create new folder name figures to store accuracy plot
+  
+    plt.savefig(f"figures/Accuracy_{model}_epoch{n_epochs}_lr{lr}_{datetime_now}.png")
 
 if __name__ == "__main__":
-    ## create a parser object
-    # parser = argparse.ArgumentParser()
-
-    # parser.add_argument("--config_file_name", "-c", type=str, default="resnetv1")
-    # args = parser.parse_args()
-    # main(args)
-
-    for config_file in ["resnetv6", "resnetv7", "resnetv8", "resnetv9"]:
-        args = argparse.Namespace(config_file_name=config_file)
-        main(args)
+    all_configs = get_grid_search(config_path="configs/resnetv1.yaml",
+                                  optimizers=["adam","sgd"],
+                                  learning_rates=[0.001,0.0001,0.00001],
+                                  num_blocks_list=[[2, 2, 2, 2],[3,2,3,4],[3,4,6,3]],
+                                  is_batchnorm=[True,False]    )
+    for i, config in tqdm(enumerate(all_configs, 1)):
+        print(f"Running config {i}/{len(all_configs)}")
+        main(config)
