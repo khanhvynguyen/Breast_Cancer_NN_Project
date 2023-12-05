@@ -7,7 +7,7 @@ import yaml
 import argparse
 import pprint
 from tqdm import tqdm
-from utils import get_dataloaders, print_out, plot_train_eval_summary,get_grid_search
+from utils import get_dataloaders, print_out, plot_train_eval_summary, resnet_get_grid_search, mlp_get_grid_search, cnn_get_grid_search
 from models.CNN import MyCNN
 from train import train_one_epoch
 from eval import eval_model
@@ -37,23 +37,23 @@ def main(config):
     lr = config["lr"]
     momentum = config["momentum"]
     device = config["device"]
-    kernel_size = config["kernel_size"]
-    flatten = config["flatten"]
+    kernel_size = config.get("kernel_size",None)
     model = config["model"]
     kernel_list = config.get("kernel_list", None)
     optimizer = config["optimizer"]
     debug = config.get("debug", False)
-    num_blocks_list = config["num_blocks_list"]
+    num_blocks_list = config.get("num_blocks_list",None)
+    is_batchnorm = config.get("is_batchnorm",None)
+    weight_decay = config.get("weight_decay",None)
+    h_dim_list = config.get("h_dim_list",None)
+    use_pooling = config.get("use_pooling",None)
+    num_kernel_conv_list = config.get("num_kernel_conv_list",None)
 
     ## check if cuda is available
     if not torch.cuda.is_available():
         device = "cpu"
 
     img_size = (h, w)
-    input_dim = h  ## h=w=input_dim
-    classes = ["benign", "malignant"]
-    n_classes = len(classes)
-    n_channels = 3  ### red, green, blue
 
     ## create a new folder to store log files named logs
     os.makedirs("logs", exist_ok=True)
@@ -71,18 +71,14 @@ def main(config):
     ## TODO: test on testloader at the end of training
 
     if model == "MLP":
-        net = MLPModel(h, w)
+        net = MLPModel(h, w, h_dim_list)
     elif model == "CNN":
-        net = MyCNN(
-            input_dim=input_dim,
-            num_kernel_conv1=kernel_list[0],
-            num_kernel_conv2=kernel_list[1],
-            num_kernel_conv3=kernel_list[2],
-            n_classes=n_classes,
-            kernel_size=kernel_size,
+        net = MyCNN(num_kernel_conv_list=num_kernel_conv_list, 
+                    kernel_size=kernel_size,
+                    use_pooling=use_pooling
         )  # type: ignore
     elif model == "resnet":
-        net = ResNet(input_dim=3, num_classes=2, num_blocks_list=num_blocks_list)
+        net = ResNet(input_dim=3, num_classes=2, num_blocks_list=num_blocks_list, is_batchnorm=is_batchnorm)
     else:
         raise NotImplementedError()
     
@@ -94,9 +90,9 @@ def main(config):
 
     # Optimizer
     if config["optimizer"] == "adam":
-        optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+        optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
     elif config["optimizer"] == "sgd":
-        optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=momentum)
+        optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
     else:
         raise NotImplementedError(f"Optimizer {config['optimizer']} not implemented")
     
@@ -119,7 +115,6 @@ def main(config):
             trainloader=trainloader,
             optimizer=optimizer,
             criterion=loss,
-            flatten=flatten,
             debug=debug
         )
 
@@ -134,7 +129,6 @@ def main(config):
             device=device,
             evalloader=validloader,
             criterion=loss,
-            flatten=flatten,
             cm_name = cm_name_valid,
             roc_name = roc_name_valid
         )
@@ -143,7 +137,6 @@ def main(config):
             device=device,
             evalloader=testloader,
             criterion=loss,
-            flatten=flatten,
             cm_name = cm_name_test,
             roc_name = roc_name_test
         )
@@ -172,7 +165,7 @@ def main(config):
         runtime_mins = round(runtime / 60, 1)  ## runtime of 1 epoch, in minutes
 
         print_out(
-            f"Epoch: {e+1} | Train loss: {train_loss} | Train acc: {train_acc} | Valid loss: {valid_loss} | Valid acc: {valid_acc}| Runtime: {runtime_mins} mins",
+            f"Epoch: {e} | Train loss: {train_loss} | Train acc: {train_acc} | Valid loss: {valid_loss} | Valid acc: {valid_acc}| Runtime: {runtime_mins} mins",
             log,
         )
 
@@ -196,11 +189,24 @@ def main(config):
     plt.savefig(f"figures/Accuracy_{model}_epoch{n_epochs}_lr{lr}_{datetime_now}.png")
 
 if __name__ == "__main__":
-    all_configs = get_grid_search(config_path="configs/resnetv1.yaml",
-                                  optimizers=["adam","sgd"],
-                                  learning_rates=[0.001,0.0001,0.00001],
-                                  num_blocks_list=[[2, 2, 2, 2],[3,2,3,4],[3,4,6,3]],
-                                  is_batchnorm=[True,False]    )
+    # all_configs = mlp_get_grid_search(config_path="configs/mlp_cuda0.yaml",
+    #                               optimizers=["sgd"],
+    #                               learning_rates=[0.00001],
+    #                               weight_decay=[0.00005]
+    #                             )
+
+    # # for i, config in tqdm(enumerate(all_configs, 1)):
+    # #     print(f"Running config {i}/{len(all_configs)}")
+    # #     main(config)
+
+    all_configs = cnn_get_grid_search(config_path="configs/cnnv1.yaml",
+                                    optimizers=["adam"],
+                                    learning_rates=[0.0001],
+                                    num_kernel_conv_list=[[32,64,64]],
+                                    use_pooling=[True])
+    
     for i, config in tqdm(enumerate(all_configs, 1)):
         print(f"Running config {i}/{len(all_configs)}")
         main(config)
+
+   

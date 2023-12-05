@@ -33,7 +33,7 @@ def conv3x3(in_dim: int, out_dim: int, stride: int, padding: int) -> nn.Conv2d:
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, in_dim: int, out_dim: int, stride: int, is_batchnorm: bool = True):
+    def __init__(self, in_dim: int, out_dim: int, stride: int, is_batchnorm: bool):
         super().__init__()
 
         ## For sequence, we have Conv2d -> BatchNorm -> ReLU -> Conv2d -> BatchNorm
@@ -92,8 +92,8 @@ class ResNet(nn.Module):
         input_dim,
         num_classes: int,
         num_blocks_list: List[int],
+        is_batchnorm: bool,
         init_weights: bool = True,
-        is_batchnorm: bool = True,
     ):
         """
         input_dim: num of channels of the input image, (e.g., 3)
@@ -103,6 +103,7 @@ class ResNet(nn.Module):
         """
 
         super().__init__()
+        self.is_batchnorm = is_batchnorm
 
         ### based on Table 1, page 5 in the paper
         if is_batchnorm:
@@ -153,7 +154,7 @@ class ResNet(nn.Module):
 
         ## append the rest of blocks, stride=1
         for i in range(num_blocks):
-            blocks.append(BasicBlock(in_dim=self.in_dim, out_dim=out_dim, stride=strides[i]))
+            blocks.append(BasicBlock(in_dim=self.in_dim, out_dim=out_dim, stride=strides[i], is_batchnorm=self.is_batchnorm))
 
             ## update self.in_dim
             self.in_dim = out_dim * BasicBlock.expansion

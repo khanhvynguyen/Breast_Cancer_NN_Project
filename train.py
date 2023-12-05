@@ -14,10 +14,9 @@ import numpy as np
 def train_one_epoch(
     model: nn.Module,
     trainloader: DataLoader,
-    device: torch.device,  ## device: default "cpu",
+    device,  ## device: default "cpu",
     optimizer,  ### SGD: rule update theta: theta_new= theta_old - learning rate * gradient
     criterion: torch.nn.CrossEntropyLoss,
-    flatten: bool,
     debug: bool = False,
 ):
     """
@@ -53,8 +52,8 @@ def train_one_epoch(
             print("debug!!!!")
             if i > 2:
                 break
-        if flatten:
-            images = images.reshape(images.shape[0], -1)
+        # if flatten:
+        #     images = images.reshape(images.shape[0], -1)
         # breakpoint()
         ## Move images, labels and magnifications to `device` (CPU or GPU)
         images = images.to(device)

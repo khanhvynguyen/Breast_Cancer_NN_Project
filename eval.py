@@ -13,7 +13,6 @@ def eval_model(
     device: torch.device,
     evalloader: DataLoader,
     criterion: torch.nn.CrossEntropyLoss,
-    flatten: bool,
     cm_name: str,
     roc_name: str,
     is_confusion_matrix: bool = True,
@@ -41,8 +40,8 @@ def eval_model(
         # if images.shape != (4, 3, 20, 20):
         #     breakpoint()
 
-        if flatten:
-            images = images.reshape(images.shape[0], -1)
+        # if flatten:
+        #     images = images.reshape(images.shape[0], -1)
             # images = torch.flatten(start_dim=1)
 
         ## Move images and labels to `device` (CPU or GPU)
@@ -112,9 +111,14 @@ def eval_model(
             logits_i = torch.stack(all_logits[mapper[str(i)]])
             labels_i = torch.stack(all_labels[mapper[str(i)]])
             probs = torch.nn.functional.softmax(logits_i, dim=1)[: , 1]
-            fpr, tpr, threshold = roc_curve(labels_i.cpu().numpy(), probs.cpu().numpy())
-            roc_auc = auc(fpr, tpr)
-            plt.plot(fpr, tpr, label=f'{mapper[str(i)]}: (AUC = {roc_auc:.2f})')
+            
+            try:
+                fpr, tpr, threshold = roc_curve(labels_i.cpu().numpy(), probs.cpu().numpy())
+                roc_auc = auc(fpr, tpr)
+                plt.plot(fpr, tpr, label=f'{mapper[str(i)]}: (AUC = {roc_auc:.2f})')
+            except:
+                continue
+            
             
         plt.plot([0, 1], [0, 1], color='black', linestyle='--')
         plt.xlabel('False Positive Rate')

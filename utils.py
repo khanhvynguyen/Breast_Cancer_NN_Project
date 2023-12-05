@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 import pprint
 import yaml
 import itertools
+import re
+import ast
+from collections import defaultdict
 from typing import List, Dict
 from torch import Tensor
 from torch.utils.data.dataloader import DataLoader
@@ -75,18 +78,26 @@ def find_images(directory, image_extensions=["*.png", "*.jpg", "*.jpeg", "*.gif"
     return image_paths
 
 
-def get_mean_std(dataloader):
-    mean_img = 0
-    mean_squared = 0
-    num_batches = len(dataloader)
-    for images, _,_ in tqdm(dataloader):
-        mean_img += images.mean(dim=(0, 2, 3))
-        mean_squared += images.mean(dim=(0, 2, 3)) ** 2
-    mean = mean_img / num_batches
-    # std = sqrt(E[X^2] - E[X]^2)
-    std = mean_squared / num_batches - mean**2
-    return mean, std
+def compute_mean_std(loader):
+    mean = 0.0
+    for images, _, _ in tqdm(loader):
+        #     print(images.shape) : 10, 3, 238, 374
+        batch_samples = images.size(0)
+        images = images.view(batch_samples, images.size(1), -1)
+        #     print(images.shape): 10, 3, 89012
+        mean += images.mean(2).sum(0)
+    mean = mean / len(loader.dataset)
 
+    var = 0.0
+    pixel_count = 0
+    for images, _, _ in tqdm(loader):
+        batch_samples = images.size(0)
+        images = images.view(batch_samples, images.size(1), -1)
+        var += ((images - mean.unsqueeze(1)) ** 2).sum([0, 2])
+        pixel_count += images.nelement() / images.size(1)
+    std = torch.sqrt(var / pixel_count)
+
+    return list(mean.numpy()), list(std.numpy())
 
 def get_dataloaders(batch_size: int, img_size: Tuple):
     ## prepare dataset
@@ -94,7 +105,7 @@ def get_dataloaders(batch_size: int, img_size: Tuple):
         [
             transforms.ToTensor(),
             transforms.Resize(img_size, antialias=True),
-            transforms.Normalize((0.5719, 0.2510, 0.5272), (0.0005, 0.0011, 0.0004)),
+            transforms.Normalize((0.7844108, 0.6242002, 0.76210874), (0.122441396, 0.17505719, 0.10627644)),
         ]
     )
 
@@ -178,7 +189,7 @@ def plot_train_eval_summary(df_train_summary, df_eval_summary):
 
 
 
-def get_grid_search(config_path: str, 
+def resnet_get_grid_search(config_path: str, 
                     optimizers: list, 
                     learning_rates: list,
                     num_blocks_list:list,
@@ -193,26 +204,151 @@ def get_grid_search(config_path: str,
     combinations = list(
         itertools.product(optimizers, learning_rates, num_blocks_list, is_batchnorm)
     )
-    grid_search = []
+    resnet_grid_search = []
     for opt, lr, num_blocks, bn in combinations:
         new_config = config.copy()
         new_config["optimizer"] = opt
         new_config["lr"] = lr
         new_config["num_blocks_list"] = num_blocks
         new_config["is_batchnorm"] = bn
-        grid_search.append(new_config)
+        resnet_grid_search.append(new_config)
 
-    return grid_search
+    return resnet_grid_search
+
+def mlp_get_grid_search(config_path: str, 
+                        optimizers: list,
+                        learning_rates: list,
+                        weight_decay:list) -> List[Dict]:
+    """
+    Read the config file and return a list of all possible combinations of hyperparameters
+    """
+    ## read the config file
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    combinations = list(
+        itertools.product(optimizers, learning_rates, weight_decay)
+    )
+    mlp_grid_search = []
+    for opt, lr, reg in combinations:
+        new_config = config.copy()
+        new_config["optimizer"] = opt
+        new_config["lr"]=lr
+        new_config["weight_decay"] = reg
+        mlp_grid_search.append(new_config)
+    
+    return mlp_grid_search
+
+    
+def cnn_get_grid_search(config_path: str,
+                        optimizers: list,
+                        learning_rates: list,
+                        num_kernel_conv_list:list,
+                        use_pooling:list)-> List[Dict]:
+
+
+    """
+    Read the config file and return a list of all possible combinations of hyperparameters
+    """
+    ## read the config file
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    combinations = list(
+        itertools.product(optimizers, learning_rates, num_kernel_conv_list, use_pooling)
+    )
+    cnn_grid_search = []
+    for opt, lr, num_kernel_conv, pooling in combinations:
+        new_config = config.copy()
+        new_config["optimizer"] = opt
+        new_config["lr"] = lr
+        new_config["num_kernel_conv_list"] = num_kernel_conv
+        new_config["use_pooling"] = pooling
+        cnn_grid_search.append(new_config)
+    return cnn_grid_search
+
+
+
+def create_result_summary_dictionary(log_path: str) -> Dict:
+    with open(log_path, 'r') as f:
+        # Read the file
+        log = f.read()
+
+    # Extract the config dictionary string
+    config_dict_str = re.search(r"config: ({.*})", log).group(1)
+    # Convert the string to a config dictionary
+    config = ast.literal_eval(config_dict_str)
+
+
+    # Extract the total parameters
+    try:
+        total_parameters_match = re.search(r"Total parameters: ([\d,]+);", log)
+        if total_parameters_match is not None:
+                total_parameters = total_parameters_match.group(1)
+        else:
+            total_parameters_match = re.search(r"Total parameters: ([\d,]+)", log)
+            if total_parameters_match is not None:
+             total_parameters = total_parameters_match.group(1)
+            else:
+                total_parameters = "0"  # Default value if no match is found
+    except AttributeError:
+        total_parameters = "0"  # Default value if an error occurs
+
+    # Remove commas and convert to integer
+    total_parameters = int(total_parameters.replace(',', ''))
+    config["total_parameters"] = total_parameters
+
+    #Extract the final test accuracy dictionary string
+    test_accuracy_dict_str = re.search(r"Final test accuracy: ({.*})", log)
+    if test_accuracy_dict_str is not None:
+        test_accuracy_dict_str = test_accuracy_dict_str.group(1)
+        final_test_accuracy = ast.literal_eval(test_accuracy_dict_str)
+
+        # Merge config and final_test_accuracy dictionaries
+        config.update(final_test_accuracy)
+        config["log_name"] = log_path.split("/")[-1]
+        if config["log_name"].startswith("resnet"):
+            config["is_batchnorm"] = True
+
+        return config
+
+def get_all_log_results():
+    log_paths = glob.glob("logs/*.log")
+    config_list = []
+    for log_path in log_paths:
+        config = create_result_summary_dictionary(log_path)
+        if config is not None:
+            config_list.append(config)
+    df = pd.DataFrame(config_list)
+    # df.drop_duplicates(inplace=True)
+    df.sort_values(by=["avg_acc"], ascending=False, inplace=True)
+
+    # df = df.loc[df.astype(str).drop_duplicates(subset=["lr","optimizer","num_blocks_list","is_batchnorm"], keep="first").index]
+    df.reset_index(drop=True, inplace=True)
+    df.to_csv("result_summary.csv")
+    return df
 
 if __name__ == "__main__":  ### put all test code in this block
+    # log_path = "logs/v2_resnet_epoch30_lr0.0001_2023-12-03_18-15-17.log"
+    # res = create_result_summary_dictionary(log_path = log_path)
+    # print(res)
+
+    # get all log files in logs folder
+    get_all_log_results()
+    
+
+
+
+    # Open the file
+    # path = "logs/resnet_epoch10_lr0.001_2023-12-02_14-27-14.log"
+
     # folder_path = "data_model/"
     # df = create_dataset_csv(folder_path)
     # print(df.sample(30))
     # df.to_csv("breast_cancer_meta_data.csv")
     # Calculate mean and std of trainloader
-    trainloader = get_dataloaders(batch_size=32, img_size=(224, 224))[0]
-    mean, std = get_mean_std(trainloader)
-    print(mean)
-    print(std)
-# tensor([0.5719, 0.2510, 0.5272])
-# tensor([0.0005, 0.0011, 0.0004])
+    # trainloader = get_dataloaders(batch_size=32, img_size=(224, 224))[0]
+    # mean, std = compute_mean_std(trainloader) # get_mean_std(trainloader)
+    # print(mean)
+    # print(std)
+    # pass
