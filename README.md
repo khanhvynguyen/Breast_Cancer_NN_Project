@@ -11,8 +11,7 @@ Install Pytorch and other dependencies:
 Copy dataset in the folder `data_model`.
 The struture is shown as below
 
-![alt text](https://raw.githubusercontent.com/khanhvynguyen/Breast_Cancer_NN_Project/main/pics/dataset.png?token=GHSAT0AAAAAACDIHFIJUAXM7CWX7MAO6QX4ZLIEMEA)
-
+![alt text](https://raw.githubusercontent.com/khanhvynguyen/Breast_Cancer_NN_Project/main/pics/dataset.png?token=GHSAT0AAAAAACQNCCFPLFBRYPQDKELWAGYSZQLNYNQ)
 
 ## Usage
 
@@ -35,6 +34,9 @@ We create dataset objects (trainset, validset, testset) from this class. Then, w
 
 - train.py:
     + `train_one_epoch()`: train 1 epoch on trainloader, return train_acc by magnification and train_loss of 1 epoch
+ 
+## Report file
+https://github.com/khanhvynguyen/Breast_Cancer_NN_Project/blob/main/report_breast_cancer.pdf
 
 - eval.py:
     + `eval_model()`: evaluate model, return eval_acc by magnification and eval_loss of 1 epoch
