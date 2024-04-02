@@ -34,12 +34,16 @@ We create dataset objects (trainset, validset, testset) from this class. Then, w
 
 - train.py:
     + `train_one_epoch()`: train 1 epoch on trainloader, return train_acc by magnification and train_loss of 1 epoch
- 
-## Report file
-https://github.com/khanhvynguyen/Breast_Cancer_NN_Project/blob/main/report_breast_cancer.pdf
 
 - eval.py:
     + `eval_model()`: evaluate model, return eval_acc by magnification and eval_loss of 1 epoch
     
 - main.py: 
     + `main()`: train and evaluate model over each epoch. The result will show the table summary of training and evaluation accuracy and loss by magnification as well as the line chart of these metrics
+
+ 
+## Report file
+Our report file can be found  <a href="https://github.com/khanhvynguyen/Breast_Cancer_NN_Project/blob/main/report_breast_cancer.pdf" target="_blank">here</a>.
+
+
+
